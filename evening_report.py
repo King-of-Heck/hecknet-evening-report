@@ -279,20 +279,6 @@ def send_image_to_printer(pil_img):
     hdc.DeleteDC()
 
 
-def send_cut_command():
-    """Send raw ESC/POS feed + full cut command."""
-    CUT_CMD  = b'\x1b\x64\x03\x1d\x56\x00'
-    hprinter = win32print.OpenPrinter(PRINTER_NAME)
-    try:
-        hjob = win32print.StartDocPrinter(hprinter, 1, ("Cut", None, "RAW"))
-        win32print.StartPagePrinter(hprinter)
-        win32print.WritePrinter(hprinter, CUT_CMD)
-        win32print.EndPagePrinter(hprinter)
-        win32print.EndDocPrinter(hprinter)
-    finally:
-        win32print.ClosePrinter(hprinter)
-
-
 def print_receipt():
     print("Fetching weather...")
     data = fetch_weather()
@@ -318,9 +304,6 @@ def print_receipt():
 
     print("Sending to printer...")
     send_image_to_printer(receipt_img)
-
-    print("Cutting...")
-    send_cut_command()
 
 
 if __name__ == "__main__":
