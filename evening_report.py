@@ -83,44 +83,53 @@ def extract_slot(data, target_date_str, hour):
     }
 
 
+CAT_SUBREDDITS = ["SleepingCats", "cats", "aww"]
+
 def fetch_aww_image():
-    headers = {"User-Agent": "weather-receipt/1.0"}
-    try:
-        r = requests.get(
-            "https://www.reddit.com/r/SleepingCats/top.json?limit=25&t=day",
-            headers=headers, timeout=15,
-        )
-        r.raise_for_status()
-        posts = r.json()["data"]["children"]
-    except Exception as e:
-        print(f"Warning: could not fetch r/SleepingCats posts — {e}")
-        return None, None
-
+    headers    = {"User-Agent": "weather-receipt/1.0"}
     image_exts = (".jpg", ".jpeg", ".png")
-    for post in posts:
-        d   = post["data"]
-        url = d.get("url", "")
 
-        if url.lower().endswith(image_exts):
-            img_url = url
-        elif "i.redd.it" in url:
-            img_url = url
-        elif d.get("preview"):
-            try:
-                img_url = d["preview"]["images"][0]["source"]["url"].replace("&amp;", "&")
-            except (KeyError, IndexError):
-                continue
-        else:
-            continue
-
+    for sub in CAT_SUBREDDITS:
+        print(f"  Trying r/{sub}...")
         try:
-            ir = requests.get(img_url, headers=headers, timeout=15)
-            ir.raise_for_status()
-            img = Image.open(io.BytesIO(ir.content)).convert("RGB")
-            return d.get("title", "Your Sleepy Kitten"), img
-        except Exception:
+            r = requests.get(
+                f"https://www.reddit.com/r/{sub}/top.json?limit=25&t=day",
+                headers=headers, timeout=15,
+            )
+            r.raise_for_status()
+            posts = r.json()["data"]["children"]
+        except Exception as e:
+            print(f"Warning: could not fetch r/{sub} — {e}")
             continue
 
+        for post in posts:
+            d   = post["data"]
+            url = d.get("url", "")
+
+            if url.lower().endswith(image_exts):
+                img_url = url
+            elif "i.redd.it" in url:
+                img_url = url
+            elif d.get("preview"):
+                try:
+                    img_url = d["preview"]["images"][0]["source"]["url"].replace("&amp;", "&")
+                except (KeyError, IndexError):
+                    continue
+            else:
+                continue
+
+            try:
+                ir = requests.get(img_url, headers=headers, timeout=15)
+                ir.raise_for_status()
+                img = Image.open(io.BytesIO(ir.content)).convert("RGB")
+                print(f"  Found image in r/{sub}.")
+                return d.get("title", "Your Sleepy Kitten"), img
+            except Exception:
+                continue
+
+        print(f"  No usable images in r/{sub}, trying next...")
+
+    print("  Warning: no cat image found in any subreddit.")
     return None, None
 
 
