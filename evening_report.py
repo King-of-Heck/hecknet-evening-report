@@ -27,9 +27,9 @@ LATITUDE     = 43.6532
 LONGITUDE    = -79.3832
 TIMEZONE     = "America/Toronto"
 
-OVERNIGHT_HOUR = 0
-MORNING_HOUR   = 8
+MORNING_HOUR   = 9
 NOON_HOUR      = 12
+EVENING_HOUR   = 18
 
 
 WMO_CODES = {
@@ -152,7 +152,7 @@ def load_font(bold=False):
     except OSError:
         return ImageFont.load_default()
 
-def build_receipt_image(overnight, morning, noon, aww_title, aww_pil, now, printed, tomorrow_str):
+def build_receipt_image(morning, noon, evening, aww_title, aww_pil, now, printed, tomorrow_str):
     """
     Renders receipt at 4x resolution then downsamples to OUTPUT resolution.
     This gives much crisper, darker text than rendering at output res directly.
@@ -183,9 +183,9 @@ def build_receipt_image(overnight, morning, noon, aww_title, aww_pil, now, print
     tomorrow_label = datetime.strptime(tomorrow_str, "%Y-%m-%d").strftime("%b %d")
 
     for label, slot in [
-        (f"OVERNIGHT  (12 AM)",          overnight),
-        (f"TOMORROW   (8 AM)",           morning),
-        (f"TOMORROW   (12 PM)",          noon),
+        (f"TOMORROW   (9 AM)",            morning),
+        (f"TOMORROW   (12 PM)",           noon),
+        (f"TOMORROW   (6 PM)",            evening),
     ]:
         add(label, bold=True)
         add(f"  {slot['condition']}")
@@ -285,9 +285,9 @@ def print_receipt():
 
     tomorrow = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-    overnight = extract_slot(data, tomorrow, OVERNIGHT_HOUR)
     morning   = extract_slot(data, tomorrow, MORNING_HOUR)
     noon      = extract_slot(data, tomorrow, NOON_HOUR)
+    evening   = extract_slot(data, tomorrow, EVENING_HOUR)
 
     print("Fetching r/aww image...")
     aww_title, aww_pil = fetch_aww_image()
@@ -297,7 +297,7 @@ def print_receipt():
 
     print("Rendering receipt...")
     receipt_img = build_receipt_image(
-        overnight, morning, noon,
+        morning, noon, evening,
         aww_title, aww_pil,
         now, printed, tomorrow,
     )
