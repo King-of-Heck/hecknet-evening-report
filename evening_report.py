@@ -1,6 +1,7 @@
 import io
 import os
 import re
+import time
 import traceback
 import requests
 import win32print
@@ -8,6 +9,12 @@ import win32ui
 from datetime import datetime, date, timedelta
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter, ImageWin
 
+
+"""
+"""
+
+WEATHER_RETRY_ATTEMPTS = 3    # how many times to try before giving up
+WEATHER_RETRY_WAIT     = 60   # seconds to wait between attempts
 
 PRINTER_NAME = "XP-80C"
 
@@ -59,11 +66,23 @@ def fetch_weather():
         "wind_speed_unit":    "kmh",
         "precipitation_unit": "mm",
         "timezone":           TIMEZONE,
-        "forecast_days":      2,   # need tomorrow's data for midnight + next morning/noon
+        "forecast_days":      2,
     }
-    r = requests.get(url, params=params, timeout=15)
-    r.raise_for_status()
-    return r.json()
+    last_error = None
+    for attempt in range(1, WEATHER_RETRY_ATTEMPTS + 1):
+        try:
+            r = requests.get(url, params=params, timeout=15)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            last_error = e
+            if attempt < WEATHER_RETRY_ATTEMPTS:
+                print(f"  Weather fetch failed (attempt {attempt}/{WEATHER_RETRY_ATTEMPTS}): {e}")
+                print(f"  Retrying in {WEATHER_RETRY_WAIT}s...")
+                time.sleep(WEATHER_RETRY_WAIT)
+            else:
+                print(f"  Weather fetch failed after {WEATHER_RETRY_ATTEMPTS} attempts.")
+    raise last_error
 
 def extract_slot(data, target_date_str, hour):
     times = data["hourly"]["time"]
