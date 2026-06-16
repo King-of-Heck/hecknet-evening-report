@@ -1,3 +1,6 @@
+import sys
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 import io
 import os
 import re
