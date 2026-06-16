@@ -105,71 +105,6 @@ def extract_slot(data, target_date_str, hour):
     }
 
 
-CAT_SUBREDDITS = ["SleepingCats", "cats", "aww"]
-
-def fetch_aww_image():
-    headers    = {
-        "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept":          "application/json, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-    }
-    image_exts = (".jpg", ".jpeg", ".png")
-
-    for sub in CAT_SUBREDDITS:
-        print(f"  Trying r/{sub}...")
-        try:
-            r = requests.get(
-                f"https://www.reddit.com/r/{sub}/top.json?limit=25&t=day",
-                headers=headers, timeout=15,
-            )
-            r.raise_for_status()
-            posts = r.json()["data"]["children"]
-        except Exception as e:
-            print(f"Warning: could not fetch r/{sub} — {e}")
-            continue
-
-        for post in posts:
-            d   = post["data"]
-            url = d.get("url", "")
-
-            if url.lower().endswith(image_exts):
-                img_url = url
-            elif "i.redd.it" in url:
-                img_url = url
-            elif d.get("preview"):
-                try:
-                    img_url = d["preview"]["images"][0]["source"]["url"].replace("&amp;", "&")
-                except (KeyError, IndexError):
-                    continue
-            else:
-                continue
-
-            try:
-                ir = requests.get(img_url, headers=headers, timeout=15)
-                ir.raise_for_status()
-                img = Image.open(io.BytesIO(ir.content)).convert("RGB")
-                print(f"  Found image in r/{sub}.")
-                return d.get("title", "Your Sleepy Kitten"), img
-            except Exception:
-                continue
-
-        print(f"  No usable images in r/{sub}, trying next...")
-
-    print("  Warning: no cat image found in any subreddit.")
-    return None, None
-
-
-def prepare_aww_image(pil_img, width_px=TEXT_PX):
-
-    w, h = pil_img.size
-    new_h = int(h * width_px / w)
-    img   = pil_img.resize((width_px, new_h), Image.LANCZOS).convert("L")
-    img   = ImageEnhance.Contrast(img).enhance(2.0)
-    img   = ImageEnhance.Sharpness(img).enhance(2.0)
-    img   = img.convert("1", dither=Image.FLOYDSTEINBERG)
-    return img.convert("RGB")
-
-
 def load_font(bold=False):
     """Load font at RENDER_SCALE * FONT_SIZE for supersampled rendering."""
     path = FONT_BOLD if bold else FONT_PATH
@@ -178,7 +113,7 @@ def load_font(bold=False):
     except OSError:
         return ImageFont.load_default()
 
-def build_receipt_image(morning, noon, evening, aww_title, aww_pil, now, printed, tomorrow_str):
+def build_receipt_image(morning, noon, evening, now, printed, tomorrow_str):
     """
     Renders receipt at 4x resolution then downsamples to OUTPUT resolution.
     This gives much crisper, darker text than rendering at output res directly.
@@ -221,28 +156,7 @@ def build_receipt_image(morning, noon, evening, aww_title, aww_pil, now, printed
 
     add("Night Night!", align="center")
 
-    aww_img_prepared = None
-    if aww_pil:
-        div()
-        add("YOUR SLEEPY MEOW MEOW", bold=True, align="center")
-        words = aww_title.split()
-        line, wrapped = "", []
-        for word in words:
-            test = (line + " " + word).strip()
-            if font_n.getlength(test) <= text_w:
-                line = test
-            else:
-                if line:
-                    wrapped.append(line)
-                line = word
-        if line:
-            wrapped.append(line)
-        for wl in wrapped:
-            add(wl, align="center")
-        aww_img_prepared = prepare_aww_image(aww_pil, width_px=TEXT_PX)
-
-    aww_hi_h = (aww_img_prepared.size[1] * S + line_h) if aww_img_prepared else 0
-    total_h  = len(ops) * line_h + aww_hi_h + line_h * 3
+    total_h  = len(ops) * line_h + line_h * 3
 
     hi_res = Image.new("RGB", (paper_w, total_h), "white")
     draw   = ImageDraw.Draw(hi_res)
@@ -257,8 +171,6 @@ def build_receipt_image(morning, noon, evening, aww_title, aww_pil, now, printed
         draw.text((x, y), text, font=font, fill="black")
         y += line_h
 
-    aww_paste_y_hires = y  # where the image goes in hi-res coords
-
     out_w  = PAPER_PX
     out_h  = int(total_h / S)
     output = hi_res.resize((out_w, out_h), Image.LANCZOS)
@@ -266,15 +178,7 @@ def build_receipt_image(morning, noon, evening, aww_title, aww_pil, now, printed
     output = ImageEnhance.Contrast(output).enhance(2.5)
     output = output.convert("L").convert("RGB")
 
-    if aww_img_prepared:
-        paste_y_out = int(aww_paste_y_hires / S)
-        x_out = (PAPER_PX - aww_img_prepared.width) // 2
-        output.paste(aww_img_prepared, (x_out, paste_y_out))
-
-    if aww_img_prepared:
-        final_h = int(aww_paste_y_hires / S) + aww_img_prepared.size[1] + line_h
-    else:
-        final_h = int(y / S) + line_h
+    final_h = int(y / S) + line_h
     output = output.crop((0, 0, out_w, final_h))
 
     return output
@@ -315,16 +219,12 @@ def print_receipt():
     noon      = extract_slot(data, tomorrow, NOON_HOUR)
     evening   = extract_slot(data, tomorrow, EVENING_HOUR)
 
-    print("Fetching r/aww image...")
-    aww_title, aww_pil = fetch_aww_image()
-
     now     = datetime.now().strftime("%A, %B %d %Y")
     printed = datetime.now().strftime("Printed %I:%M %p")
 
     print("Rendering receipt...")
     receipt_img = build_receipt_image(
         morning, noon, evening,
-        aww_title, aww_pil,
         now, printed, tomorrow,
     )
 
