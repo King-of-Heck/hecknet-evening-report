@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.log
+
+# Local credentials - never commit these
+.env
+gmail_app_password.txt
+
+# Runtime state
+pending_delays.json
+wnn_last_seen.json
+receipt_preview*.png
