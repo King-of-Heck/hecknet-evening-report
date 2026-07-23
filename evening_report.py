@@ -1,3 +1,15 @@
+"""
+Evening report receipt.
+
+The overnight counterpart to the morning report: tomorrow's forecast at 9AM,
+noon and 6PM, plus tomorrow's first meeting. Reads the same agenda mail as the
+morning script but filters it to the following day.
+
+    python evening_report.py                 print it
+    python evening_report.py --preview       render receipt_preview_evening.png
+    python evening_report.py --meeting-test  check the calendar fetch only
+"""
+
 import sys
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -14,8 +26,6 @@ from datetime import datetime, date, timedelta
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter, ImageWin
 
 
-"""
-"""
 
 WEATHER_RETRY_ATTEMPTS = 3    # how many times to try before giving up
 WEATHER_RETRY_WAIT     = 60   # seconds to wait between attempts
